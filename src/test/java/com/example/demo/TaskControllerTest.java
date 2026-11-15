@@ -1,11 +1,14 @@
 package com.example.demo;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
 
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
@@ -206,5 +209,36 @@ class TaskControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.id == " + doneTask.id() + ")].title").value(hasItem("All Filter Completed")))
                 .andExpect(jsonPath("$[?(@.id == " + pendingTask.id() + ")].title").value(hasItem("All Filter Incomplete")));
+    }
+
+    @Test
+    void shouldGetTaskCount() throws Exception {
+        String allTasksJson = mockMvc.perform(get("/tasks"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<Task> allTasks = objectMapper.readValue(allTasksJson, new TypeReference<List<Task>>() {});
+        long expectedTotal = allTasks.size() + 2;
+        long expectedDone = allTasks.stream().filter(Task::done).count() + 1;
+
+        mockMvc.perform(post("/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Task(1L, "Count Done Task", true))))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Task(2L, "Count Pending Task", false))))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/tasks/count"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(expectedTotal))
+                .andExpect(jsonPath("$.done").value(expectedDone));
+    }
+
+    @Test
+    void shouldReturn405WhenPostingToCountEndpoint() throws Exception {
+        mockMvc.perform(post("/tasks/count"))
+                .andExpect(status().isMethodNotAllowed());
     }
 }
