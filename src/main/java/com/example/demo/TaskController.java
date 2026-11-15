@@ -17,8 +17,13 @@ public class TaskController {
 
     // GET /tasks
     @GetMapping
-    public List<Task> getAllTasks() {
-        return tasks;
+    public List<Task> getAllTasks(@RequestParam(required = false) Boolean done) {
+        if (done == null) {
+            return tasks;
+        }
+        return tasks.stream()
+                .filter(t -> t.done() == done)
+                .toList();
     }
 
     // GET /tasks/{id}
@@ -31,6 +36,7 @@ public class TaskController {
         }
         return ResponseEntity.notFound().build();
     }
+
     // POST /tasks
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -38,6 +44,19 @@ public class TaskController {
         Task newTask = new Task(nextId++, task.title(), task.done());
         tasks.add(newTask);
         return newTask;
+    }
+
+    // PUT /tasks/{id}
+    @PutMapping("/{id}")
+    public ResponseEntity<Task> updateTask(@PathVariable Long id, @Valid @RequestBody Task updatedTask) {
+        for (int i = 0; i < tasks.size(); i++) {
+            if (tasks.get(i).id() == id) {
+                Task task = new Task(id, updatedTask.title(), updatedTask.done());
+                tasks.set(i, task);
+                return ResponseEntity.ok(task);
+            }
+        }
+        return ResponseEntity.notFound().build();
     }
 
     // DELETE /tasks/{id}
